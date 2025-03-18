@@ -8,8 +8,9 @@ pipeline {
     }
 
     agent any
+
     stages {
-        stage('checkout') {
+        stage('Checkout') {
             steps {
                 script {
                     deleteDir()
@@ -29,55 +30,59 @@ pipeline {
 
         stage('Verify Files') {
             steps {
-                sh 'ls -la'  // Verify if terraform directory exists
+                sh '''
+                echo "Checking repository structure..."
+                pwd
+                ls -la
+                '''
             }
         }
 
-        stage('Plan') {
+        stage('Terraform Init') {
             steps {
                 sh '''
-                pwd
-                ls -la  # Check if terraform directory is present
-                if [ -d "terraform" ]; then
-                    cd terraform
-                    terraform init
-                    terraform plan -out tfplan
-                    terraform show -no-color tfplan > tfplan.txt
-                else
-                    echo "Error: terraform/ directory not found!"
-                    exit 1
-                fi
+                terraform init
+                '''
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                sh '''
+                terraform plan -out=tfplan
+                terraform show -no-color tfplan > tfplan.txt
                 '''
             }
         }
 
         stage('Approval') {
            when {
-               not {
-                   equals expected: true, actual: params.autoApprove
-               }
+               not { equals expected: true, actual: params.autoApprove }
            }
            steps {
                script {
-                    def plan = readFile 'terraform/tfplan.txt'
+                    def plan = readFile 'tfplan.txt'
                     input message: "Do you want to apply the plan?",
                     parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
                }
            }
        }
 
-        stage('Apply') {
+        stage('Terraform Apply') {
             steps {
                 sh '''
-                if [ -d "terraform" ]; then
-                    cd terraform
-                    terraform apply -input=false tfplan
-                else
-                    echo "Error: terraform/ directory not found!"
-                    exit 1
-                fi
+                terraform apply -auto-approve tfplan
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Terraform execution completed successfully!"
+        }
+        failure {
+            echo "Terraform execution failed!"
         }
     }
 }
