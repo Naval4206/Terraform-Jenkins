@@ -27,11 +27,27 @@ pipeline {
             }
         }
 
+        stage('Verify Files') {
+            steps {
+                sh 'ls -la'  // Verify if terraform directory exists
+            }
+        }
+
         stage('Plan') {
             steps {
-                sh 'pwd;cd terraform/ ; terraform init'
-                sh "pwd;cd terraform/ ; terraform plan -out tfplan"
-                sh 'pwd;cd terraform/ ; terraform show -no-color tfplan > tfplan.txt'
+                sh '''
+                pwd
+                ls -la  # Check if terraform directory is present
+                if [ -d "terraform" ]; then
+                    cd terraform
+                    terraform init
+                    terraform plan -out tfplan
+                    terraform show -no-color tfplan > tfplan.txt
+                else
+                    echo "Error: terraform/ directory not found!"
+                    exit 1
+                fi
+                '''
             }
         }
 
@@ -52,7 +68,15 @@ pipeline {
 
         stage('Apply') {
             steps {
-                sh "pwd;cd terraform/ ; terraform apply -input=false tfplan"
+                sh '''
+                if [ -d "terraform" ]; then
+                    cd terraform
+                    terraform apply -input=false tfplan
+                else
+                    echo "Error: terraform/ directory not found!"
+                    exit 1
+                fi
+                '''
             }
         }
     }
